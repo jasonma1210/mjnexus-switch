@@ -1,17 +1,16 @@
 // timegm stub for Switch (newlib doesn't provide it)
-// mktime uses local time, timegm uses UTC — close enough for annotation dates
+// MuPDF expects timegm() to convert UTC struct tm to time_t
+// We save/restore TZ around mktime to simulate UTC behavior
 #include <time.h>
 #include <stdlib.h>
 
-time_t timegm(struct tm *tm) {
-    // Save original timezone
-    const char *tz = getenv("TZ");
+time_t mjx_timegm(struct tm *tm) {
+    const char *saved_tz = getenv("TZ");
     setenv("TZ", "UTC0", 1);
     tzset();
     time_t result = mktime(tm);
-    // Restore timezone
-    if (tz) {
-        setenv("TZ", tz, 1);
+    if (saved_tz) {
+        setenv("TZ", saved_tz, 1);
     } else {
         unsetenv("TZ");
     }
