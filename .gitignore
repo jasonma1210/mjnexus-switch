@@ -1,0 +1,33 @@
+# Build output
+/build/
+/dist/
+*.o
+*.d
+*.elf
+*.nso
+*.nro
+*.nsp
+*.nacp
+*.npdm
+*.rsp
+*.map
+*.sym
+
+# MuPDF build artifacts
+mupdf/build/
+libmupdf.a
+libmupdf.a.dSYM
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Logs
+*.log
+pacman.log
+
+# Local devkitPro
+/devkitpro-local/

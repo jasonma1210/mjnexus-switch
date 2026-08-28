@@ -1,0 +1,141 @@
+name: Build MJNexus Switch
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DEVKITPRO: /opt/devkitpro
+  DEVKITARM: /opt/devkitpro/devkitARM
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup devkitPro
+        uses: devkitpro/setup-devkitpro@v1
+        with:
+          pacman_packages: |
+            devkitA64
+            libnx
+            switch-tools
+            switch-mesa
+            switch-glfw
+            switch-glm
+            switch-freetype
+            switch-libpng
+            switch-bzip2
+            switch-zlib
+
+      - name: Verify devkitPro setup
+        run: |
+          echo "DEVKITPRO=$DEVKITPRO"
+          ls $DEVKITPRO/libnx/switch_rules
+          which aarch64-none-elf-gcc
+          source /etc/profile
+          echo "After sourcing profile:"
+          echo "DEVKITPRO=$DEVKITPRO"
+
+      - name: Clone dependencies
+        run: |
+          # Clone Borealis (UI library)
+          git clone --depth 1 -b moonlight_wiliwili \
+            https://github.com/XITRIX/borealis.git \
+            borealis/moonlight_wiliwili
+
+          # Clone MuPDF 1.16.x (PDF/EPUB renderer)
+          git clone --depth 1 -b 1.16.x \
+            https://github.com/ArtifexSoftware/mupdf.git mupdf
+
+          echo "Borealis:" $(ls borealis/moonlight_wiliwili/CMakeLists.txt)
+          echo "MuPDF:" $(ls mupdf/Makefile)
+
+      - name: Build Borealis
+        run: |
+          source /etc/profile
+          export DEVKITPRO=/opt/devkitpro
+          cd borealis/moonlight_wiliwili
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/libnx/cmake/Toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+      - name: Build MuPDF for Switch
+        run: |
+          source /etc/profile
+          export DEVKITPRO=/opt/devkitpro
+          cd mupdf
+          # MuPDF slim build config
+          make -j$(nproc) build=release \
+            HAVE_TESSERA=yes \
+            USE_SYSTEM_LIBS=no \
+            CROSS=aarch64-none-elf- \
+            XCFLAGS="-D__SWITCH__ -I$DEVKITPRO/libnx/include"
+
+      - name: Build MJNexus Switch
+        run: |
+          source /etc/profile
+          export DEVKITPRO=/opt/devkitpro
+          cd /opt/devkitpro/pacman/bin
+          ls pacman
+          cd $GITHUB_WORKSPACE
+
+          # 先确保 libmupdf.a 存在
+          if [ ! -f lib/libmupdf.a ]; then
+            mkdir -p lib
+            cp mupdf/build/release/libmupdf.a lib/
+            ls -la lib/libmupdf.a
+          fi
+
+          # 编译主工程
+          make -j$(nproc)
+
+      - name: Build Forwarder NSP
+        run: |
+          source /etc/profile
+          export DEVKITPRO=/opt/devkitpro
+          bash scripts/build_nsp.sh \
+            --nro build/mjnexus_switch.nro \
+            --output dist \
+            --title-id 0x0100000000001000
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mjnexus-switch-build
+          path: |
+            build/mjnexus_switch.nro
+            dist/*.nsp
+            dist/*.nacp
+            dist/*.npdm
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: MJNexus Switch ${{ github.ref_name }}
+          body: |
+            ## MJNexus Switch ${{ github.ref_name }}
+
+            Build artifacts for Nintendo Switch (Atmosphere CFW).
+
+            - **NRO**: Directly run with hbmenu / HBAS
+            - **NSP**: Forwarder for installation via tinfoil / goldleaf
+
+            Minimum atmosphere version: **1.5.0+**
+          files: |
+            build/mjnexus_switch.nro
+            dist/*.nsp
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
