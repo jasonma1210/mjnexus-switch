@@ -18,7 +18,7 @@ TARGET		:=	mjnexus_switch
 BUILD		:=	build
 SOURCES		:=	source source/app
 DATA		:=	data
-INCLUDES	 := 	include 		borealis/moonlight_wiliwili/library/include 		borealis/moonlight_wiliwili/library/include/borealis/extern 		borealis/moonlight_wiliwili/library/include/borealis/extern/nanovg 		borealis/moonlight_wiliwili/library/include/borealis/extern/nanovg/framework 		borealis/moonlight_wiliwili/library/lib/extern/tweeny/include 		borealis/moonlight_wiliwili/library/lib/extern/fmt/include 		borealis/moonlight_wiliwili/library/lib/extern/yoga 		borealis/moonlight_wiliwili/library/lib/extern/switch-libpulsar/include                         borealis/moonlight_wiliwili/library/lib/extern/libromfs/lib/include
+INCLUDES	 := 	include 		borealis/moonlight_wiliwili/library/include 		borealis/moonlight_wiliwili/library/include/borealis/extern 		borealis/moonlight_wiliwili/library/include/borealis/extern/nanovg 		borealis/moonlight_wiliwili/library/include/borealis/extern/nanovg/framework 		borealis/moonlight_wiliwili/library/lib/extern/tweeny/include 		borealis/moonlight_wiliwili/library/lib/extern/fmt/include 		borealis/moonlight_wiliwili/library/lib/extern/yoga 		borealis/moonlight_wiliwili/library/lib/extern/switch-libpulsar/include                         
 ROMFS		:=	romfs
 VERSION_MAJOR := 0
 VERSION_MINOR := 1
@@ -33,7 +33,8 @@ ICON := resources/icons/icon.jpg
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
-CFLAGS	+=	-D__SWITCH__ -DBRLS_RESOURCES=./ -DUSE_LIBROMFS $(INCLUDE)
+CFLAGS	+=	-D__SWITCH__ $(INCLUDE)
+CFLAGS += -DBRLS_RESOURCES=\"./\"
 CXXFLAGS	:= $(CFLAGS) -std=c++17
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
@@ -42,7 +43,7 @@ LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*
 #---------------------------------------------------------------------------------
 EXTRA_LIBS := $(TOPDIR)/lib/libmupdf.a
 export EXTRA_LIBS
-LIBS := $(EXTRA_LIBS) -lborealis -lromfs -lmupdf -lfreetype -lpng -lz -lnx -lm
+LIBS := $(EXTRA_LIBS) -lborealis  -lmupdf -lfreetype -lpng -lz -lnx -lm
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
