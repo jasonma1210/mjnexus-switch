@@ -11,6 +11,9 @@ jobs:
   switch:
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:latest
+    env:
+      # devkitPro mirror (默认 pkg.devkitpro.org 有时 403)
+      DKP_PACMAN_MIRROR: "https://pkg.devkitpro.org"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,7 +22,15 @@ jobs:
 
       - name: Install Switch portlibs
         run: |
-          dkp-pacman -S --noconfirm switch-zlib switch-libjpeg-turbo switch-freetype switch-libpng switch-bzip2 switch-lz4 switch-harfbuzz 2>&1 | tail -10
+          # 先尝试设置 mirror，pacman 403 是 keyring/服务器问题
+          echo "=== 尝试设置 mirror ==="
+          sed -i "s|Server = https://pkg.devkitpro.org|Server = ${DKP_PACMAN_MIRROR}|g" /opt/devkitpro/pacman.conf 2>/dev/null || true
+          cat /opt/devkitpro/pacman.conf 2>/dev/null | grep -i server || true
+          echo ""
+          # 直接装，容器内自带缓存可能有我们需要的
+          # 如果 403 就跳过 -Sy（容器镜像应该已经有一些包）
+          dkp-pacman -S --noconfirm switch-zlib switch-libjpeg-turbo switch-freetype switch-libpng switch-bzip2 switch-lz4 switch-harfbuzz 2>&1 | tail -15
+          echo ""
           echo "=== Include check ==="
           for h in zlib.h ft2build.h hb.h jpeglib.h png.h bzlib.h lz4.h; do
             echo "  $h: $(find $DEVKITPRO -name $h 2>/dev/null | head -1 || echo 'NOT FOUND')"
@@ -29,37 +40,34 @@ jobs:
         run: |
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
           git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
-          # 确保必要目录存在
           mkdir -p data build dist
-          echo "=== Borealis ==="
-          ls borealis/moonlight_wiliwili/ | head -10
-          echo ""
-          echo "=== 根目录文件 ==="
-          ls -la *.jpg *.json 2>/dev/null || echo "no jpg/json in root"
 
       - name: Build project
         run: |
-          make -j$(nproc) 2>&1 | tee /tmp/build.log | tail -150
+          # 先编 MuPDF
+          echo "=== Building MuPDF ==="
+          make -f Makefile.mupdf -j$(nproc) 2>&1 | tee /tmp/mupdf.log | tail -20
           echo ""
-          echo "=== Build result ==="
-          if ls build/*.nro 1>/dev/null 2>&1; then
-            ls -la build/*.nro
-            echo "=== NRO built successfully! ==="
-          elif ls *.nro 1>/dev/null 2>&1; then
-            ls -la *.nro
-            echo "=== NRO built successfully (root)! ==="
-          else
-            echo "NRO NOT FOUND"
-            echo ""
-            echo "=== Last 30 error lines ==="
-            grep -iE "error:|undefined reference|fatal|missing separator|No rule" /tmp/build.log | tail -30
-            exit 1
-          fi
+          echo "=== MuPDF result ==="
+          ls -la lib/libmupdf.a 2>/dev/null && echo "✅ libmupdf.a built" || echo "❌ libmupdf.a FAILED"
+          grep -iE "error:|undefined reference|fatal" /tmp/mupdf.log | head -20
+          
+          if [ ! -f lib/libmupdf.a ]; then exit 1; fi
+          
+          # 再编主工程
+          echo ""
+          echo "=== Building main project ==="
+          make -j$(nproc) 2>&1 | tee /tmp/main.log
+          echo ""
+          echo "=== Main result ==="
+          ls -la *.nro build/*.nro 2>/dev/null
+          grep -iE "error:|undefined reference|fatal" /tmp/main.log | head -20
 
       - name: Build NSP
         if: always()
         run: |
-          NRO=$(ls build/*.nro 2>/dev/null || ls *.nro 2>/dev/null)
+          NRO=$(ls *.nro 2>/dev/null || ls build/*.nro 2>/dev/null || echo "")
+          echo "NRO: $NRO"
           if [ -n "$NRO" ]; then
             bash scripts/build_nsp.sh --nro "$NRO" --output dist --title-id 0x0100000000001000
             ls -la dist/
