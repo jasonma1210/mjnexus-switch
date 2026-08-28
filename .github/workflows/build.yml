@@ -40,6 +40,29 @@ jobs:
           git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
           mkdir -p data build dist
 
+      - name: Dump file structure
+        run: |
+          echo "=== Root ==="
+          ls -la
+          echo ""
+          echo "=== data/ ==="
+          ls -la data/ 2>/dev/null
+          echo ""
+          echo "=== resources/icons/ ==="
+          ls -la resources/icons/ 2>/dev/null
+          echo ""
+          echo "=== Any icon_* files? ==="
+          find . -name 'icon_*' -o -name '*American*' 2>/dev/null
+          echo ""
+          echo "=== BINFILES test ==="
+          DATA := data
+          for f in $(ls data/*.* 2>/dev/null); do echo "  bin: $f"; done
+          echo ""
+          echo "=== switch_rules check ==="
+          grep -n "icon_American\|MULTI_ICON\|icon_" $DEVKITPRO/libnx/switch_rules 2>/dev/null | head -20
+          echo ""
+          echo "=== NACP files ==="
+          ls *.nacp 2>/dev/null
       - name: Build MuPDF
         run: |
           export DEVKITPRO=$DEVKITPRO
