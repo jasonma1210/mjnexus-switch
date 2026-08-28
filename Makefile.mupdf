@@ -36,7 +36,6 @@ INCLUDES := \
     -I$(MUPDF_DIR)/thirdparty/harfbuzz/src \
     -I$(MUPDF_DIR)/thirdparty/jbig2dec \
     -I$(MUPDF_DIR)/thirdparty/libjpeg \
-    -I$(MUPDF_DIR)/thirdparty/mujs \
     -I$(MUPDF_DIR)/thirdparty/openjpeg/src/lib/openjp2 \
     -I$(MUPDF_DIR)/thirdparty/zlib \
     $(SWITCH_INC)
@@ -51,7 +50,6 @@ FB2_SRC  := $(wildcard $(MUPDF_DIR)/source/fb2/*.c)
 EPUB_SRC := $(wildcard $(MUPDF_DIR)/source/epub/*.c)
 SVG_SRC  := $(wildcard $(MUPDF_DIR)/source/svg/*.c)
 THIRD_SRC := \
-    $(wildcard $(MUPDF_DIR)/thirdparty/mujs/*.c) \
     $(wildcard $(MUPDF_DIR)/thirdparty/jbig2dec/*.c) \
     $(wildcard $(MUPDF_DIR)/thirdparty/openjpeg/src/lib/openjp2/*.c) \
     $(wildcard $(MUPDF_DIR)/thirdparty/zlib/*.c)
