@@ -58,7 +58,7 @@ jobs:
           cmake .. \
             -DPLATFORM_SWITCH=ON \
             -DUSE_DEKO3D=ON \
-            -DUSE_LIBROMFS=ON \
+            -DUSE_LIBROMFS=OFF \
             -DBRLS_UNITY_BUILD=OFF \
             -DCMAKE_BUILD_TYPE=Release \
             2>&1 | tee /tmp/borealis_cmake.log
