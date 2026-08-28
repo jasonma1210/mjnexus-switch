@@ -22,21 +22,46 @@ jobs:
           echo "=== Borealis ==="
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
           echo "=== MuPDF 1.16.1 ==="
-          git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf || \
-            (curl -sL https://mupdf.com/downloads/archive/mupdf-1.16.1-source.tar.xz -o mupdf.tar.xz && \
-             tar xf mupdf.tar.xz && mv mupdf-1.16.1-source mupdf && rm mupdf.tar.xz)
+          git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
 
-      - name: Build MuPDF
+      - name: Build MuPDF (native)
         run: |
+          echo "=== MuPDF thirdparty 目录 ==="
+          ls mupdf/thirdparty/
+          echo ""
+          echo "=== 检查 MuPDF Makefile 支持的变量 ==="
+          grep -E "^[A-Z_]+[?:]?=" mupdf/Makefile | head -20
+          echo ""
+          echo "=== 尝试原生构建 MuPDF ==="
           cd mupdf
-          ls Makefile
-          make -j$(nproc) build=release HAVE_TESSERA=no HAVE_GLFW=no NOX11=yes NOGLCALLS=yes CROSS=aarch64-none-elf- XCFLAGS="-D__SWITCH__ -I$DEVKITPRO/libnx/include" 2>&1 | tail -30 || echo "MuPDF build failed, trying simpler approach"
+          # 设置交叉编译环境变量
+          export CC=aarch64-none-elf-gcc
+          export CXX=aarch64-none-elf-g++
+          export AR=aarch64-none-elf-ar
+          export RANLIB=aarch64-none-elf-ranlib
+          export STRIP=aarch64-none-elf-strip
+          export LD=aarch64-none-elf-ld
+          export DEFINES="-D__SWITCH__ -DFZ_ENABLE_ICC=0 -DFZ_ENABLE_JS=0 -DHAVE_PTHREAD=0 -DFZ_NO_STDIO=0 -DOPJ_STATIC"
+          export CFLAGS="-march=armv8-a+crc -mtune=cortex-a57 -mtp=soft -fPIC -O2 -ffunction-sections -Wno-error -std=gnu11 $DEFINES -I$DEVKITPRO/libnx/include"
+          export LDFLAGS="-march=armv8-a+crc -mtune=cortex-a57 -mtp=soft -fPIC -O2 -Wl,--gc-sections"
+          make -j$(nproc) build=release HAVE_TESSERA=no HAVE_GLFW=no NOX11=yes NOGLCALLS=yes 2>&1 | tail -30 || echo "Build failed, checking errors..."
+          ls build/release/libmupdf*.a 2>/dev/null && echo "MuPDF built!" || echo "MuPDF not built"
+          ls build/release/thirdparty/ 2>/dev/null | head -10
 
       - name: Build MJNexus
         run: |
-          if [ -f mupdf/build/release/libmupdf.a ]; then mkdir -p lib && cp mupdf/build/release/libmupdf.a lib/; fi
+          # 把 MuPDF 产物复制到 lib/
+          mkdir -p lib
+          if ls mupdf/build/release/libmupdf*.a 1>/dev/null 2>&1; then
+            cp mupdf/build/release/libmupdf*.a lib/
+            # 也复制 thirdparty 静态库
+            find mupdf/build/release/thirdparty -name "*.a" -exec cp {} lib/ \; 2>/dev/null || true
+          fi
+          ls -la lib/
+          echo ""
+          echo "=== 编译主工程 ==="
           make -j$(nproc) 2>&1 | tail -50
-          ls -la build/*.nro 2>/dev/null && echo "=== NRO built successfully! ===" || echo "NRO not found - check errors above"
+          ls -la build/*.nro 2>/dev/null && echo "=== NRO built! ===" || echo "NRO not found"
 
       - name: Build NSP
         if: always()
