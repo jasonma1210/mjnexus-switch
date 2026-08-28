@@ -78,15 +78,18 @@ jobs:
           echo ""
           echo "=== Borealis result ==="
           BRLS_A=$(find . -name "libborealis.a" 2>/dev/null | head -1)
-          echo "Found: $BRLS_A"
-          if [ -n "$BRLS_A" ] && [ -f "$BRLS_A" ]; then
-            cp "$BRLS_A" ../../../lib/
-            ls -la ../../../lib/libborealis.a
-            echo "✅ libborealis.a built"
-          else
-            echo "❌ libborealis.a NOT FOUND after build"
-            exit 1
-          fi
+            echo "Found BRLS_A: $BRLS_A"
+            if [ -n "$BRLS_A" ] && [ -f "$BRLS_A" ]; then
+              cp "$BRLS_A" ../../../lib/
+              # 复制所有其他 .a（fmt/yoga/tinyxml2/tweeny 等）
+              find . -name "*.a" ! -name "libborealis.a" -exec cp {} ../../../lib/ \;
+              echo "=== lib/ 目录所有 .a ==="
+              ls -la ../../../lib/*.a
+              echo "✅ All static libs copied"
+            else
+              echo "❌ libborealis.a NOT FOUND after build"
+              exit 1
+            fi
 
       - name: Build main project
         run: |
