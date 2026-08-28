@@ -19,34 +19,46 @@ jobs:
 
       - name: Install Switch portlibs
         run: |
+          # 先更新 keyring 解决 403
+          pacman-key --init 2>&1 | tail -1 || true
+          pacman-key --populate 2>&1 | tail -1 || true
           dkp-pacman -Sy 2>&1 | tail -3 || true
           dkp-pacman -S --noconfirm switch-zlib switch-libjpeg-turbo switch-freetype switch-libpng switch-bzip2 switch-lz4 2>&1 | tail -5
+          echo "=== Include check ==="
           echo "zlib.h: $(find $DEVKITPRO -name zlib.h 2>/dev/null | head -1)"
+          echo "freetype.h: $(find $DEVKITPRO -name freetype.h 2>/dev/null | head -1)"
+          echo "libjpeg: $(find $DEVKITPRO -name jpeglib.h 2>/dev/null | head -1)"
 
       - name: Clone deps
         run: |
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
-          # MuPDF 1.16.1 with submodules (thirdparty libs are submodules)
-          git clone --depth 1 --recurse-submodules -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
-          echo "=== thirdparty contents ==="
-          ls mupdf/thirdparty/
-          echo ""
-          echo "=== jbig2dec ==="
-          ls mupdf/thirdparty/jbig2dec/ | head -10
-          echo ""
-          echo "=== zlib ==="
-          ls mupdf/thirdparty/zlib/ 2>/dev/null | head -10 || echo "no bundled zlib (use portlibs)"
+          # MuPDF 1.16.1 — 不需要 submodules（我们用 portlibs）
+          git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
+          echo "=== MuPDF thirdparty (只是为了确认目录存在就行，不会用里面的源码) ==="
+          ls mupdf/thirdparty/ | head -10
 
       - name: Build project
         run: |
-          make -j$(nproc) 2>&1 | tail -100
-          ls -la build/*.nro 2>/dev/null && echo "=== NRO built! ===" || echo "NRO not found"
+          make -j$(nproc) 2>&1 | tee /tmp/build.log | tail -150
+          echo ""
+          echo "=== Build result ==="
+          if ls build/*.nro 1>/dev/null 2>&1; then
+            ls -la build/*.nro
+            echo "=== NRO built successfully! ==="
+          else
+            echo "NRO NOT FOUND"
+            echo ""
+            echo "=== Last 30 error lines ==="
+            grep -iE "error:|undefined reference|fatal" /tmp/build.log | tail -30
+            exit 1
+          fi
 
       - name: Build NSP
         if: always()
         run: |
           if [ -f build/mjnexus_switch.nro ]; then
             bash scripts/build_nsp.sh --nro build/mjnexus_switch.nro --output dist --title-id 0x0100000000001000
+            ls -la dist/
           fi
 
       - name: Upload
