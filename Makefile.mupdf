@@ -1,5 +1,5 @@
-# Makefile.mupdf — build MuPDF natively for Nintendo Switch
-# Delegates to MuPDF's own Makefile with cross-compilation overrides.
+# Makefile.mupdf — build MuPDF (embedded) for Nintendo Switch
+# Uses simple per-file compilation, pulling headers from MuPDF thirdparty.
 
 ifeq ($(strip $(DEVKITPRO)),)
 $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
@@ -8,47 +8,93 @@ endif
 MUPDF_DIR := mupdf
 
 # Cross-compiler
-export CC      := aarch64-none-elf-gcc
-export CXX     := aarch64-none-elf-g++
-export AR      := aarch64-none-elf-ar
-export RANLIB  := aarch64-none-elf-ranlib
-export STRIP   := aarch64-none-elf-strip
-export LD      := aarch64-none-elf-ld
+CC      := aarch64-none-elf-gcc
+AR      := aarch64-none-elf-ar
 
-# Switch-specific flags
 ARCH     := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC
 SWITCH_INC := -I$(DEVKITPRO)/libnx/include
 
-# MuPDF config: disable unsupported features for embedded use
-export DEFINES := \
+# MuPDF 1.16.1 has bundled thirdparty libs we use directly
+DEFINES := \
+    -DNDEBUG -DTOFU -DTOFU_CJK \
     -D__SWITCH__ \
     -DFZ_ENABLE_ICC=0 \
     -DFZ_ENABLE_JS=0 \
     -DHAVE_PTHREAD=0 \
     -DFZ_NO_STDIO=0 \
-    -DOPJ_STATIC \
-    -DNDEBUG
+    -DOPJ_STATIC -DOPJ_HAVE_STDINT_H -DOPJ_HAVE_INTTYPES_H \
+    -DFT2_BUILD_LIBRARY \
+    '-DFT_CONFIG_MODULES_H="slimftmodules.h"' \
+    '-DFT_CONFIG_OPTIONS_H="slimftoptions.h"' \
+    -Dtimegm=mktime
 
-export CFLAGS   := $(ARCH) -O2 -ffunction-sections -Wno-error -std=gnu11 $(DEFINES) $(SWITCH_INC)
-export CXXFLAGS := $(ARCH) -O2 -ffunction-sections -Wno-error -std=gnu++14 $(DEFINES) $(SWITCH_INC)
-export LDFLAGS  := $(ARCH) -O2 -Wl,--gc-sections
+INCLUDES := \
+    -I$(MUPDF_DIR)/include \
+    -I$(MUPDF_DIR)/generated \
+    -I$(MUPDF_DIR)/scripts/freetype \
+    -I$(MUPDF_DIR)/scripts/libjpeg \
+    -I$(MUPDF_DIR)/thirdparty/freetype/include \
+    -I$(MUPDF_DIR)/thirdparty/harfbuzz/src \
+    -I$(MUPDF_DIR)/thirdparty/jbig2dec \
+    -I$(MUPDF_DIR)/thirdparty/libjpeg \
+    -I$(MUPDF_DIR)/thirdparty/mujs \
+    -I$(MUPDF_DIR)/thirdparty/openjpeg/src/lib/openjp2 \
+    -I$(MUPDF_DIR)/thirdparty/zlib \
+    $(SWITCH_INC)
+
+CFLAGS   := $(ARCH) -O2 -Wno-error -std=gnu11 $(DEFINES) $(INCLUDES)
+
+# Source lists (MuPDF 1.16.1)
+FITZ_SRC := $(wildcard $(MUPDF_DIR)/source/fitz/*.c)
+PDF_SRC  := $(wildcard $(MUPDF_DIR)/source/pdf/*.c)
+XPS_SRC  := $(wildcard $(MUPDF_DIR)/source/xps/*.c)
+CBZ_SRC  := $(wildcard $(MUPDF_DIR)/source/cbz/*.c)
+FB2_SRC  := $(wildcard $(MUPDF_DIR)/source/fb2/*.c)
+EPUB_SRC := $(wildcard $(MUPDF_DIR)/source/epub/*.c)
+SVG_SRC  := $(wildcard $(MUPDF_DIR)/source/svg/*.c)
+THIRD_SRC := \
+    $(wildcard $(MUPDF_DIR)/thirdparty/mujs/*.c) \
+    $(wildcard $(MUPDF_DIR)/thirdparty/jbig2dec/*.c) \
+    $(wildcard $(MUPDF_DIR)/thirdparty/openjpeg/src/lib/openjp2/*.c) \
+    $(wildcard $(MUPDF_DIR)/thirdparty/zlib/*.c)
+
+# Slim freetype (embedded from MuPDF scripts)
+FT_SRC := $(MUPDF_DIR)/scripts/freetype/ftbase.c \
+          $(MUPDF_DIR)/scripts/freetype/ftbbox.c \
+          $(MUPDF_DIR)/scripts/freetype/ftbitmap.c \
+          $(MUPDF_DIR)/scripts/freetype/ftdebug.c \
+          $(MUPDF_DIR)/scripts/freetype/ftfstype.c \
+          $(MUPDF_DIR)/scripts/freetype/ftgasp.c \
+          $(MUPDF_DIR)/scripts/freetype/ftglyph.c \
+          $(MUPDF_DIR)/scripts/freetype/ftinit.c \
+          $(MUPDF_DIR)/scripts/freetype/ftmm.c \
+          $(MUPDF_DIR)/scripts/freetype/ftobjs.c \
+          $(MUPDF_DIR)/scripts/freetype/ftoutln.c \
+          $(MUPDF_DIR)/scripts/freetype/fttrigon.c \
+          $(MUPDF_DIR)/scripts/freetype/fttype1.c \
+          $(MUPDF_DIR)/scripts/freetype/ftutil.c
+
+# Filter out unsupported files
+FITZ_SRC := $(filter-out %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c,$(FITZ_SRC))
+THIRD_SRC := $(filter-out %ftfstype.c,$(THIRD_SRC))
+
+ALL_SRC := $(FITZ_SRC) $(PDF_SRC) $(XPS_SRC) $(CBZ_SRC) $(FB2_SRC) $(EPUB_SRC) $(SVG_SRC) $(THIRD_SRC) $(FT_SRC)
+
+OBJ_DIR := mupdf-build
+OBJ_FILES := $(patsubst $(MUPDF_DIR)/%.c,$(OBJ_DIR)/%.o,$(ALL_SRC))
 
 .PHONY: all clean
 all: lib/libmupdf.a
 
-lib/libmupdf.a:
+lib/libmupdf.a: $(OBJ_FILES)
 	@mkdir -p lib
-	@echo "=== Building MuPDF (native cross-compile) ==="
-	@cd $(MUPDF_DIR) && \
-	  make -j$$(nproc) build=release \
-	    HAVE_TESSERA=no HAVE_GLFW=no NOX11=yes NOGLCALLS=yes \
-	    2>&1 | tail -20
-	@echo "=== Copying MuPDF artifacts ==="
-	@cp -v $(MUPDF_DIR)/build/release/libmupdf*.a lib/ 2>/dev/null || \
-	  (echo "ERROR: MuPDF build failed - check output above" && exit 1)
-	@find $(MUPDF_DIR)/build/release/thirdparty -name "*.a" -exec cp {} lib/ \; 2>/dev/null || true
-	@echo "=== MuPDF build complete ==="
+	@echo ">>> Archiving libmupdf.a ($(words $(OBJ_FILES)) objects)"
+	@$(AR) rcs $@ $(OBJ_FILES)
+	@echo ">>> Done: libmupdf.a ($$(du -h lib/libmupdf.a | cut -f1))"
+
+$(OBJ_DIR)/%.o: $(MUPDF_DIR)/%.c
+	@mkdir -p $(dir $@)
+	@$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	@cd $(MUPDF_DIR) && make clean 2>/dev/null || true
-	@rm -rf lib/*.a
+	@rm -rf $(OBJ_DIR) lib/libmupdf.a
