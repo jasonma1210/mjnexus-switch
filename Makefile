@@ -16,7 +16,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	mjnexus_switch
 BUILD		:=	build
-SOURCES		:=	source
+SOURCES		:=	source source/app
 DATA		:=	data
 INCLUDES	 := 	include 		borealis/moonlight_wiliwili/library/include 		borealis/moonlight_wiliwili/library/include/borealis/extern 		borealis/moonlight_wiliwili/library/include/borealis/extern/nanovg 		borealis/moonlight_wiliwili/library/include/borealis/extern/nanovg/framework 		borealis/moonlight_wiliwili/library/lib/extern/tweeny/include 		borealis/moonlight_wiliwili/library/lib/extern/fmt/include 		borealis/moonlight_wiliwili/library/lib/extern/yoga 		borealis/moonlight_wiliwili/library/lib/extern/switch-libpulsar/include
 ROMFS		:=	romfs
@@ -33,8 +33,8 @@ ICON := resources/icons/icon.jpg
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
-CFLAGS	+=	-D__SWITCH__ $(INCLUDE)
-CXXFLAGS	:= $(CFLAGS) -std=c++17 -fno-rtti -fno-exceptions
+CFLAGS	+=	-D__SWITCH__ -DBRLS_RESOURCES="." $(INCLUDE)
+CXXFLAGS	:= $(CFLAGS) -std=c++17
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 #---------------------------------------------------------------------------------
