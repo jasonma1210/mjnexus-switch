@@ -5,18 +5,14 @@
 
 namespace mjnexus
 {
-    namespace ColorKeys
-    {
-        constexpr const char* BG = "bgColor";
-        constexpr const char* TEXT = "textColor";
-        constexpr const char* ACCENT = "accentColor";
-    }
-
+    // 简化版：直接用 brls 主题的 string key
     inline NVGcolor getBgColor() {
-        return brls::Theme::getDarkTheme().getColor(BG);
+        return brls::Theme::getDarkTheme().getColor("bgColor");
     }
-
     inline NVGcolor getTextColor() {
-        return brls::Theme::getDarkTheme().getColor(TEXT);
+        return brls::Theme::getDarkTheme().getColor("textColor");
+    }
+    inline NVGcolor getAccentColor() {
+        return brls::Theme::getDarkTheme().getColor("accentColor");
     }
 }
