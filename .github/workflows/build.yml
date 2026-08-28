@@ -111,9 +111,9 @@ jobs:
 all: libmupdf.a
 
 libmupdf.a:
-	@echo "Building MuPDF for Switch (simplified)..."
-	@echo "You may need to configure MuPDF manually."
-	touch libmupdf.a
+  @echo "Building MuPDF for Switch (simplified)..."
+  @echo "You may need to configure MuPDF manually."
+  touch libmupdf.a
 EOF
           # 尝试真实构建，如果失败就用占位
           make -j$(nproc) build=release \
