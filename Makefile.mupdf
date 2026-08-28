@@ -1,6 +1,6 @@
 # Makefile.mupdf — build MuPDF (embedded) for Nintendo Switch
 # MuPDF 1.16.1, uses Switch portlibs for all thirdparty deps
-# (zlib, freetype, libjpeg, libpng, bzip2, lz4 — no bundled thirdparty)
+# (zlib, freetype, libjpeg, libpng, bzip2, lz4, harfbuzz — no bundled thirdparty)
 
 ifeq ($(strip $(DEVKITPRO)),)
 $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
@@ -19,19 +19,12 @@ DEFINES := \
     -D__SWITCH__ \
     -DFZ_ENABLE_ICC=0 \
     -DFZ_ENABLE_JS=0 \
-    -DHAVE_PTHREAD=0 \
-    -DFZ_NO_STDIO=0 \
-    -DOPJ_STATIC -DOPJ_HAVE_STDINT_H -DOPJ_HAVE_INTTYPES_H \
-    -FZ_ENABLE_JS=0 \
-    -D_POSIX_C_SOURCE=200809L \
-    -Dtimegm=mjx_timegm \
-
     -DFZ_HAVE_PTHREAD=0 \
     -DHAVE_PTHREAD=0 \
     -DFZ_NO_STDIO=0 \
     -DOPJ_STATIC -DOPJ_HAVE_STDINT_H -DOPJ_HAVE_INTTYPES_H \
-    -DFZ_NO_ATEXIT=0 \
-    -DFZ_NO_REDACT=0 \
+    -D_POSIX_C_SOURCE=200809L \
+    -Dtimegm=mjx_timegm
 
 INCLUDES := \
     -I$(MUPDF_DIR)/include \
@@ -39,9 +32,12 @@ INCLUDES := \
     -I$(DEVKITPRO)/libnx/include \
     -I$(PORTLIBS)/include \
     -I$(PORTLIBS)/include/freetype2 \
-    -I$(PORTLIBS)/include/harfbuzz
+    -I$(PORTLIBS)/include/harfbuzz \
+    -I$(CURDIR)/include
 
-CFLAGS   := $(ARCH) -O2 -Wno-error -std=gnu11 $(DEFINES) $(INCLUDES)
+# -include mjx_stubs/timegm.h: 预加载 mjx_timegm 声明，因为 -Dtimegm=mjx_timegm 替换后
+# MuPDF 源文件需要 mjx_timegm 函数，但它不在 MuPDF 库里（在主工程 stub 里）
+CFLAGS   := $(ARCH) -O2 -Wno-error -std=gnu11 $(DEFINES) $(INCLUDES) -include mjx_stubs/timegm.h
 
 FITZ_SRC := $(wildcard $(MUPDF_DIR)/source/fitz/*.c)
 PDF_SRC  := $(wildcard $(MUPDF_DIR)/source/pdf/*.c)
@@ -51,10 +47,7 @@ FB2_SRC  := $(wildcard $(MUPDF_DIR)/source/fb2/*.c)
 EPUB_SRC := $(wildcard $(MUPDF_DIR)/source/epub/*.c)
 SVG_SRC  := $(wildcard $(MUPDF_DIR)/source/svg/*.c)
 
-# 过滤掉需要外部库或 thirdparty 的源文件
-# - lcms 颜色管理 (ICC 已禁用)
-# - jbig2 / openjpeg / lz4 / fax 压缩 thirdparty
-# - PNG / TIFF (用 portlibs 但 MuPDF 自己写了，可能冲突)
+# 过滤掉需要不存在的 thirdparty 的源文件
 FITZ_SRC := $(filter-out \
     %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c \
     %filter-jbig2.c %filter-openjpeg.c %filter-lz4.c %filter-fax.c \
@@ -62,7 +55,7 @@ FITZ_SRC := $(filter-out \
     %jmemcust.c \
     ,$(FITZ_SRC))
 
-# 不再编 bundled thirdparty（全部用 Switch portlibs）
+# 所有 thirdparty 都用 Switch portlibs
 ALL_SRC := $(FITZ_SRC) $(PDF_SRC) $(XPS_SRC) $(CBZ_SRC) $(FB2_SRC) $(EPUB_SRC) $(SVG_SRC)
 
 OBJ_DIR := mupdf-build
