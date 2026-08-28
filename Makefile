@@ -43,7 +43,7 @@ LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*
 #---------------------------------------------------------------------------------
 EXTRA_LIBS := $(TOPDIR)/lib/libmupdf.a
 export EXTRA_LIBS
-LIBS := -Wl,--start-group $(EXTRA_LIBS) -lborealis -lfmt -lyogacore -ltinyxml2 -lmupdf -lfreetype -lpng -lz -lnx -lm -Wl,--end-group
+LIBS := -Wl,--start-group $(EXTRA_LIBS) -lborealis -lfmt -lyogacore -ltinyxml2 -lmupdf -ldeko3d -lfreetype -lpng -lz -lnx -lm -Wl,--end-group
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
