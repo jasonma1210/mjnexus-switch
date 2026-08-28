@@ -32,12 +32,6 @@ INCLUDES := \
     -I$(MUPDF_DIR)/generated \
     -I$(MUPDF_DIR)/scripts/freetype \
     -I$(MUPDF_DIR)/scripts/libjpeg \
-    -I$(MUPDF_DIR)/thirdparty/freetype/include \
-    -I$(MUPDF_DIR)/thirdparty/harfbuzz/src \
-    -I$(MUPDF_DIR)/thirdparty/jbig2dec \
-    -I$(MUPDF_DIR)/thirdparty/libjpeg \
-    -I$(MUPDF_DIR)/thirdparty/openjpeg/src/lib/openjp2 \
-    -I$(MUPDF_DIR)/thirdparty/zlib \
     $(SWITCH_INC)
 
 CFLAGS   := $(ARCH) -O2 -Wno-error -std=gnu11 $(DEFINES) $(INCLUDES)
@@ -70,7 +64,7 @@ FT_SRC := $(MUPDF_DIR)/scripts/freetype/ftbase.c \
           $(MUPDF_DIR)/scripts/freetype/ftutil.c
 
 # 过滤掉需要 lcms2 的颜色管理文件（我们禁用了 ICC）
-FITZ_SRC := $(filter-out %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c %filter-jbig2.c %filter-lz4.c %filter-openjpeg.c %filter-fax.c,$(FITZ_SRC))
+FITZ_SRC := $(filter-out %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c %filter-jbig2.c %filter-openjpeg.c %filter-fax.c,$(FITZ_SRC))
 
 ALL_SRC := $(FITZ_SRC) $(PDF_SRC) $(XPS_SRC) $(CBZ_SRC) $(FB2_SRC) $(EPUB_SRC) $(SVG_SRC) $(THIRD_SRC) $(FT_SRC)
 
