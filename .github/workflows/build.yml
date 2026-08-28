@@ -17,50 +17,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify devkitPro
-        run: |
-          echo "DEVKITPRO=$DEVKITPRO"
-          ls $DEVKITPRO/libnx/switch_rules
-          which aarch64-none-elf-gcc
-          dkp-pacman -V
-
-      - name: Install additional tools
-        run: |
-          apt-get update -y
-          apt-get install -y libfreetype6-dev pkg-config curl wget
-
       - name: Clone deps
         run: |
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
           git clone --depth 1 -b 1.16.x https://github.com/ArtifexSoftware/mupdf.git mupdf
 
-      - name: Build Borealis
-        env:
-          DEVKITPRO: /opt/devkitpro
-        run: |
-          cd borealis/moonlight_wiliwili && mkdir -p build && cd build
-          cmake .. -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/libnx/cmake/Toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DBOREALIS_BUILD_TESTS=OFF
-          make -j$(nproc) 2>&1 | tail -15
-
       - name: Build MuPDF
-        env:
-          DEVKITPRO: /opt/devkitpro
         run: |
           cd mupdf
-          make -j$(nproc) build=release HAVE_TESSERA=no HAVE_GLFW=no NOX11=yes NOGLCALLS=yes CROSS=aarch64-none-elf- XCFLAGS="-D__SWITCH__ -I$DEVKITPRO/libnx/include" 2>&1 | tail -25 || echo "MuPDF needs manual config"
+          make -j$(nproc) build=release HAVE_TESSERA=no HAVE_GLFW=no NOX11=yes NOGLCALLS=yes CROSS=aarch64-none-elf- XCFLAGS="-D__SWITCH__ -I$DEVKITPRO/libnx/include" 2>&1 | tail -30 || echo "MuPDF build may need manual config"
 
       - name: Build MJNexus
-        env:
-          DEVKITPRO: /opt/devkitpro
         run: |
           if [ -f mupdf/build/release/libmupdf.a ]; then mkdir -p lib && cp mupdf/build/release/libmupdf.a lib/; fi
-          make -j$(nproc) 2>&1 | tail -30
-          ls -la build/*.nro 2>/dev/null && echo "NRO built!" || echo "NRO not found"
+          make -j$(nproc) 2>&1 | tail -40
+          ls -la build/*.nro 2>/dev/null && echo "=== NRO built successfully! ===" || echo "NRO not found - check errors above"
 
       - name: Build NSP
         if: always()
-        env:
-          DEVKITPRO: /opt/devkitpro
         run: |
           if [ -f build/mjnexus_switch.nro ]; then
             bash scripts/build_nsp.sh --nro build/mjnexus_switch.nro --output dist --title-id 0x0100000000001000
