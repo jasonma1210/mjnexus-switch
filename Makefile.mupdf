@@ -53,7 +53,7 @@ SVG_SRC  := $(wildcard $(MUPDF_DIR)/source/svg/*.c)
 FITZ_SRC := $(filter-out \
     %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c \
     %filter-jbig2.c %filter-openjpeg.c %filter-lz4.c %filter-fax.c \
-    %load-png.c %load-tiff.c %save-png.c %save-tiff.c \
+    %load-jbig2.c %load-jpx.c %load-png.c %load-tiff.c %save-png.c %save-tiff.c \
     %jmemcust.c \
     ,$(FITZ_SRC))
 
