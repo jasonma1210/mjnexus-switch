@@ -19,7 +19,6 @@ jobs:
 
       - name: Install Switch portlibs
         run: |
-          # pacman db 403 暂时跳过 -Sy，直接 -S（容器内自带缓存）
           dkp-pacman -S --noconfirm switch-zlib switch-libjpeg-turbo switch-freetype switch-libpng switch-bzip2 switch-lz4 switch-harfbuzz 2>&1 | tail -10
           echo "=== Include check ==="
           for h in zlib.h ft2build.h hb.h jpeglib.h png.h bzlib.h lz4.h; do
@@ -30,6 +29,13 @@ jobs:
         run: |
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
           git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
+          # 确保必要目录存在
+          mkdir -p data build dist
+          echo "=== Borealis ==="
+          ls borealis/moonlight_wiliwili/ | head -10
+          echo ""
+          echo "=== 根目录文件 ==="
+          ls -la *.jpg *.json 2>/dev/null || echo "no jpg/json in root"
 
       - name: Build project
         run: |
@@ -39,19 +45,23 @@ jobs:
           if ls build/*.nro 1>/dev/null 2>&1; then
             ls -la build/*.nro
             echo "=== NRO built successfully! ==="
+          elif ls *.nro 1>/dev/null 2>&1; then
+            ls -la *.nro
+            echo "=== NRO built successfully (root)! ==="
           else
             echo "NRO NOT FOUND"
             echo ""
             echo "=== Last 30 error lines ==="
-            grep -iE "error:|undefined reference|fatal" /tmp/build.log | tail -30
+            grep -iE "error:|undefined reference|fatal|missing separator|No rule" /tmp/build.log | tail -30
             exit 1
           fi
 
       - name: Build NSP
         if: always()
         run: |
-          if [ -f build/mjnexus_switch.nro ]; then
-            bash scripts/build_nsp.sh --nro build/mjnexus_switch.nro --output dist --title-id 0x0100000000001000
+          NRO=$(ls build/*.nro 2>/dev/null || ls *.nro 2>/dev/null)
+          if [ -n "$NRO" ]; then
+            bash scripts/build_nsp.sh --nro "$NRO" --output dist --title-id 0x0100000000001000
             ls -la dist/
           fi
 
@@ -62,6 +72,7 @@ jobs:
           name: mjnexus-switch-build
           path: |
             build/*.nro
+            *.nro
             dist/*.nsp
             dist/*.nacp
             dist/*.npdm
