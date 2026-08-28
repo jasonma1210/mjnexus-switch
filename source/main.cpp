@@ -1,4 +1,4 @@
-#include <switch.h>
+// 注意：不 include switch.h！moonlight_wiliwili 用 SDL 跨平台
 #include <borealis.hpp>
 #include <cstdio>
 
@@ -17,9 +17,9 @@ int main(int argc, char* argv[])
 
     while (brls::Application::mainLoop())
     {
-        // 空循环，Activity 管理 UI
+        // mainLoop 返回 false 时自然退出
     }
 
-    brls::Application::exit();
+    // 不需要主动 exit，直接 return
     return 0;
 }
