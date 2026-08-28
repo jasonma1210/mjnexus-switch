@@ -19,18 +19,23 @@ jobs:
 
       - name: Clone deps
         run: |
+          echo "=== Borealis ==="
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
-          git clone --depth 1 -b 1.16.x https://github.com/ArtifexSoftware/mupdf.git mupdf
+          echo "=== MuPDF 1.16.1 ==="
+          git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf || \
+            (curl -sL https://mupdf.com/downloads/archive/mupdf-1.16.1-source.tar.xz -o mupdf.tar.xz && \
+             tar xf mupdf.tar.xz && mv mupdf-1.16.1-source mupdf && rm mupdf.tar.xz)
 
       - name: Build MuPDF
         run: |
           cd mupdf
-          make -j$(nproc) build=release HAVE_TESSERA=no HAVE_GLFW=no NOX11=yes NOGLCALLS=yes CROSS=aarch64-none-elf- XCFLAGS="-D__SWITCH__ -I$DEVKITPRO/libnx/include" 2>&1 | tail -30 || echo "MuPDF build may need manual config"
+          ls Makefile
+          make -j$(nproc) build=release HAVE_TESSERA=no HAVE_GLFW=no NOX11=yes NOGLCALLS=yes CROSS=aarch64-none-elf- XCFLAGS="-D__SWITCH__ -I$DEVKITPRO/libnx/include" 2>&1 | tail -30 || echo "MuPDF build failed, trying simpler approach"
 
       - name: Build MJNexus
         run: |
           if [ -f mupdf/build/release/libmupdf.a ]; then mkdir -p lib && cp mupdf/build/release/libmupdf.a lib/; fi
-          make -j$(nproc) 2>&1 | tail -40
+          make -j$(nproc) 2>&1 | tail -50
           ls -la build/*.nro 2>/dev/null && echo "=== NRO built successfully! ===" || echo "NRO not found - check errors above"
 
       - name: Build NSP
