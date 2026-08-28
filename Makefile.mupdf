@@ -19,7 +19,7 @@ DEFINES := \
     -D__SWITCH__ \
     -DFZ_ENABLE_ICC=0 \
     -DFZ_ENABLE_JS=0 \
-    -DFZ_HAVE_HARFBUZZ=0 \
+
     -DFZ_HAVE_PTHREAD=0 \
     -DHAVE_PTHREAD=0 \
     -DFZ_NO_STDIO=0 \
@@ -33,7 +33,8 @@ INCLUDES := \
     -I$(MUPDF_DIR)/generated \
     -I$(DEVKITPRO)/libnx/include \
     -I$(PORTLIBS)/include \
-    -I$(PORTLIBS)/include/freetype2
+    -I$(PORTLIBS)/include/freetype2 \
+    -I$(PORTLIBS)/include/harfbuzz
 
 CFLAGS   := $(ARCH) -O2 -Wno-error -std=gnu11 $(DEFINES) $(INCLUDES)
 
