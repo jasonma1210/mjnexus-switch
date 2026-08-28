@@ -19,23 +19,17 @@ jobs:
 
       - name: Install Switch portlibs
         run: |
-          # 先更新 keyring 解决 403
-          pacman-key --init 2>&1 | tail -1 || true
-          pacman-key --populate 2>&1 | tail -1 || true
-          dkp-pacman -Sy 2>&1 | tail -3 || true
-          dkp-pacman -S --noconfirm switch-zlib switch-libjpeg-turbo switch-freetype switch-libpng switch-bzip2 switch-lz4 2>&1 | tail -5
+          # pacman db 403 暂时跳过 -Sy，直接 -S（容器内自带缓存）
+          dkp-pacman -S --noconfirm switch-zlib switch-libjpeg-turbo switch-freetype switch-libpng switch-bzip2 switch-lz4 switch-harfbuzz 2>&1 | tail -10
           echo "=== Include check ==="
-          echo "zlib.h: $(find $DEVKITPRO -name zlib.h 2>/dev/null | head -1)"
-          echo "freetype.h: $(find $DEVKITPRO -name freetype.h 2>/dev/null | head -1)"
-          echo "libjpeg: $(find $DEVKITPRO -name jpeglib.h 2>/dev/null | head -1)"
+          for h in zlib.h ft2build.h hb.h jpeglib.h png.h bzlib.h lz4.h; do
+            echo "  $h: $(find $DEVKITPRO -name $h 2>/dev/null | head -1 || echo 'NOT FOUND')"
+          done
 
       - name: Clone deps
         run: |
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
-          # MuPDF 1.16.1 — 不需要 submodules（我们用 portlibs）
           git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
-          echo "=== MuPDF thirdparty (只是为了确认目录存在就行，不会用里面的源码) ==="
-          ls mupdf/thirdparty/ | head -10
 
       - name: Build project
         run: |
