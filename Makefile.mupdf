@@ -19,6 +19,12 @@ DEFINES := \
     -D__SWITCH__ \
     -DFZ_ENABLE_ICC=0 \
     -DFZ_ENABLE_JS=0 \
+    -DHAVE_PTHREAD=0 \
+    -DFZ_NO_STDIO=0 \
+    -DOPJ_STATIC -DOPJ_HAVE_STDINT_H -DOPJ_HAVE_INTTYPES_H \
+    -FZ_ENABLE_JS=0 \
+    -D_POSIX_C_SOURCE=200809L \
+    -Dtimegm=mjx_timegm \
 
     -DFZ_HAVE_PTHREAD=0 \
     -DHAVE_PTHREAD=0 \
@@ -26,7 +32,6 @@ DEFINES := \
     -DOPJ_STATIC -DOPJ_HAVE_STDINT_H -DOPJ_HAVE_INTTYPES_H \
     -DFZ_NO_ATEXIT=0 \
     -DFZ_NO_REDACT=0 \
-    -D_POSIX_C_SOURCE=200809L -D__BSD_VISIBLE=1 -Dtimegm=mjx_timegm
 
 INCLUDES := \
     -I$(MUPDF_DIR)/include \
