@@ -1,5 +1,6 @@
 # Makefile.mupdf — build MuPDF (embedded) for Nintendo Switch
-# Uses simple per-file compilation, pulling headers from MuPDF thirdparty.
+# MuPDF 1.16.1, uses Switch portlibs for all thirdparty deps
+# (zlib, freetype, libjpeg, libpng, bzip2, lz4 — no bundled thirdparty)
 
 ifeq ($(strip $(DEVKITPRO)),)
 $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
@@ -12,7 +13,6 @@ CC      := aarch64-none-elf-gcc
 AR      := aarch64-none-elf-ar
 
 ARCH     := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC
-SWITCH_INC := -I$(DEVKITPRO)/libnx/include -I$(PORTLIBS)/include
 
 DEFINES := \
     -DNDEBUG -DTOFU -DTOFU_CJK \
@@ -22,17 +22,14 @@ DEFINES := \
     -DHAVE_PTHREAD=0 \
     -DFZ_NO_STDIO=0 \
     -DOPJ_STATIC -DOPJ_HAVE_STDINT_H -DOPJ_HAVE_INTTYPES_H \
-    -DFT2_BUILD_LIBRARY \
-    '-DFT_CONFIG_MODULES_H="slimftmodules.h"' \
-    '-DFT_CONFIG_OPTIONS_H="slimftoptions.h"' \
     -Dtimegm=mktime
 
 INCLUDES := \
     -I$(MUPDF_DIR)/include \
     -I$(MUPDF_DIR)/generated \
-    -I$(MUPDF_DIR)/scripts/freetype \
-    -I$(MUPDF_DIR)/scripts/libjpeg \
-    $(SWITCH_INC)
+    -I$(DEVKITPRO)/libnx/include \
+    -I$(PORTLIBS)/include \
+    -I$(PORTLIBS)/include/freetype2
 
 CFLAGS   := $(ARCH) -O2 -Wno-error -std=gnu11 $(DEFINES) $(INCLUDES)
 
@@ -43,30 +40,19 @@ CBZ_SRC  := $(wildcard $(MUPDF_DIR)/source/cbz/*.c)
 FB2_SRC  := $(wildcard $(MUPDF_DIR)/source/fb2/*.c)
 EPUB_SRC := $(wildcard $(MUPDF_DIR)/source/epub/*.c)
 SVG_SRC  := $(wildcard $(MUPDF_DIR)/source/svg/*.c)
-THIRD_SRC := \
-    $(wildcard $(MUPDF_DIR)/thirdparty/jbig2dec/*.c) \
-    $(wildcard $(MUPDF_DIR)/thirdparty/openjpeg/src/lib/openjp2/*.c) \
-    $(wildcard $(MUPDF_DIR)/thirdparty/zlib/*.c)
 
-FT_SRC := $(MUPDF_DIR)/scripts/freetype/ftbase.c \
-          $(MUPDF_DIR)/scripts/freetype/ftbbox.c \
-          $(MUPDF_DIR)/scripts/freetype/ftbitmap.c \
-          $(MUPDF_DIR)/scripts/freetype/ftdebug.c \
-          $(MUPDF_DIR)/scripts/freetype/ftfstype.c \
-          $(MUPDF_DIR)/scripts/freetype/ftgasp.c \
-          $(MUPDF_DIR)/scripts/freetype/ftglyph.c \
-          $(MUPDF_DIR)/scripts/freetype/ftinit.c \
-          $(MUPDF_DIR)/scripts/freetype/ftmm.c \
-          $(MUPDF_DIR)/scripts/freetype/ftobjs.c \
-          $(MUPDF_DIR)/scripts/freetype/ftoutln.c \
-          $(MUPDF_DIR)/scripts/freetype/fttrigon.c \
-          $(MUPDF_DIR)/scripts/freetype/fttype1.c \
-          $(MUPDF_DIR)/scripts/freetype/ftutil.c
+# 过滤掉需要外部库或 thirdparty 的源文件
+# - lcms 颜色管理 (ICC 已禁用)
+# - jbig2 / openjpeg / lz4 / fax 压缩 thirdparty
+# - PNG / TIFF (用 portlibs 但 MuPDF 自己写了，可能冲突)
+FITZ_SRC := $(filter-out \
+    %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c \
+    %filter-jbig2.c %filter-openjpeg.c %filter-lz4.c %filter-fax.c \
+    %load-png.c %load-tiff.c %save-png.c %save-tiff.c \
+    ,$(FITZ_SRC))
 
-# 过滤掉需要 lcms2 的颜色管理文件（我们禁用了 ICC）
-FITZ_SRC := $(filter-out %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c %filter-jbig2.c %filter-openjpeg.c %filter-fax.c,$(FITZ_SRC))
-
-ALL_SRC := $(FITZ_SRC) $(PDF_SRC) $(XPS_SRC) $(CBZ_SRC) $(FB2_SRC) $(EPUB_SRC) $(SVG_SRC) $(THIRD_SRC) $(FT_SRC)
+# 不再编 bundled thirdparty（全部用 Switch portlibs）
+ALL_SRC := $(FITZ_SRC) $(PDF_SRC) $(XPS_SRC) $(CBZ_SRC) $(FB2_SRC) $(EPUB_SRC) $(SVG_SRC)
 
 OBJ_DIR := mupdf-build
 OBJ_FILES := $(patsubst $(MUPDF_DIR)/%.c,$(OBJ_DIR)/%.o,$(ALL_SRC))
