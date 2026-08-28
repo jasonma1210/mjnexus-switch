@@ -1,171 +1,62 @@
 name: Build MJNexus Switch
-
-on:
+'on':
   push:
-    branches: [main]
+    branches:
+    - main
   pull_request:
-    branches: [main]
-  workflow_dispatch:
-
+    branches:
+    - main
+  workflow_dispatch: null
+env:
+  DEVKITPRO: /opt/devkitpro
 jobs:
   switch:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install devkitPro toolchain
-        env:
-          DEVKITPRO: /opt/devkitpro
-        run: |
-          echo "=== 安装 devkitPro pacman ==="
-          wget https://github.com/devkitPro/pacman/releases/download/v6.0.2/devkitpro-pacman-installer.pkg.tar.gz
-          tar xzf devkitpro-pacman-installer.pkg.tar.gz
-          # 解压 pkg payload
-          cd devkitpro-pacman-installer.pkg
-          for f in */Payload; do
-            pkgname=$(echo "$f" | cut -d/ -f1)
-            echo "Extracting $pkgname"
-            cd "$pkgname"
-            if [ -d Payload ]; then
-              cp -R Payload/* /
-            fi
-            cd ..
-          done
-          cd ..
-          
-          # 设置环境
-          export DEVKITPRO=/opt/devkitpro
-          export PATH="$DEVKITPRO/pacman/bin:$PATH"
-          
-          echo "=== 验证 pacman ==="
-          pacman --version
-          which dkp-pacman
-          
-          # 初始化 keyring 并安装 Switch 工具链
-          echo "=== 安装 Switch 工具链 ==="
-          dkp-pacman-key --init
-          dkp-pacman-key --populate devkitpro
-          dkp-pacman -Syy
-          dkp-pacman -S --noconfirm \
-            devkitA64 \
-            libnx \
-            switch-tools \
-            switch-mesa \
-            switch-glfw \
-            switch-glm \
-            switch-freetype \
-            switch-libpng \
-            switch-bzip2 \
-            switch-zlib \
-            switch-jpeg \
-            switch-lz4
-
-          echo "=== 验证安装 ==="
-          ls $DEVKITPRO/libnx/switch_rules
-          which aarch64-none-elf-gcc
-          
-          # 持久化环境变量
-          echo "DEVKITPRO=$DEVKITPRO" >> $GITHUB_ENV
-          echo "$DEVKITPRO/pacman/bin" >> /etc/paths.d/devkitpro
-          echo "$DEVKITPRO/tools/bin" >> /etc/paths.d/devkitpro-tools
-
-      - name: Clone Borealis
-        run: |
-          git clone --depth 1 -b moonlight_wiliwili \
-            https://github.com/XITRIX/borealis.git \
-            borealis/moonlight_wiliwili
-          echo "Done: Borealis cloned"
-
-      - name: Clone MuPDF
-        run: |
-          git clone --depth 1 -b 1.16.x \
-            https://github.com/ArtifexSoftware/mupdf.git mupdf
-          echo "Done: MuPDF cloned"
-
-      - name: Build Borealis
-        env:
-          DEVKITPRO: ${{ env.DEVKITPRO }}
-        run: |
-          export DEVKITPRO=/opt/devkitpro
-          cd borealis/moonlight_wiliwili
-          mkdir -p build && cd build
-          cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/libnx/cmake/Toolchain.cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBOREALIS_BUILD_TESTS=OFF
-          make -j$(nproc) 2>&1 | tail -20
-
-      - name: Build MuPDF
-        env:
-          DEVKITPRO: ${{ env.DEVKITPRO }}
-        run: |
-          export DEVKITPRO=/opt/devkitpro
-          export PATH="$DEVKITPRO/devkitA64/bin:$PATH"
-          cd mupdf
-          # 简化构建 - 只构建 libmupdf.a
-          cat > Makefile.switch << 'EOF'
-all: libmupdf.a
-
-libmupdf.a:
-  @echo "Building MuPDF for Switch (simplified)..."
-  @echo "You may need to configure MuPDF manually."
-  touch libmupdf.a
-EOF
-          # 尝试真实构建，如果失败就用占位
-          make -j$(nproc) build=release \
-            HAVE_TESSERA=no \
-            HAVE_GLFW=no \
-            NOX11=yes \
-            NOGLCALLS=yes \
-            CROSS=aarch64-none-elf- \
-            XCFLAGS="-D__SWITCH__ -I$DEVKITPRO/libnx/include" \
-            2>&1 | tail -30 || echo "MuPDF build may need manual config"
-
-      - name: Build MJNexus Switch
-        env:
-          DEVKITPRO: ${{ env.DEVKITPRO }}
-        run: |
-          export DEVKITPRO=/opt/devkitpro
-          cd $GITHUB_WORKSPACE
-          
-          # 确保 MuPDF 产物
-          if [ -f mupdf/build/release/libmupdf.a ]; then
-            mkdir -p lib
-            cp mupdf/build/release/libmupdf.a lib/
-          fi
-          
-          # 确保 Borealis 产物（如果用了 Makefile 而不是 CMake）
-          echo "=== Make dirs ==="
-          make -j$(nproc) 2>&1 | tail -30
-          echo "Exit: $?"
-          
-          ls -la build/mjnexus_switch.nro 2>/dev/null && echo "✅ NRO built!" || echo "❌ NRO not found"
-
-      - name: Build Forwarder NSP
-        if: always()
-        run: |
-          export DEVKITPRO=/opt/devkitpro
-          if [ -f build/mjnexus_switch.nro ]; then
-            bash scripts/build_nsp.sh \
-              --nro build/mjnexus_switch.nro \
-              --output dist \
-              --title-id 0x0100000000001000
-          else
-            echo "Skipping NSP build - no NRO"
-          fi
-
-      - name: Upload Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mjnexus-switch-build
-          path: |
-            build/*.nro
-            dist/*.nsp
-            dist/*.nacp
-            dist/*.npdm
-          if-no-files-found: ignore
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Install devkitPro toolchain
+      run: "echo \"=== \u5B89\u88C5 devkitPro pacman ===\"\nwget -q https://github.com/devkitPro/pacman/releases/download/v6.0.2/devkitpro-pacman-installer.pkg.tar.gz\n\
+        mkdir -p /tmp/dkp && cd /tmp/dkp\ntar xzf ../devkitpro-pacman-installer.pkg.tar.gz\nfor f in */Payload; do\n    pkgname=$(echo\
+        \ \"$f\" | cut -d/ -f1)\n    echo \"Extracting $pkgname\"\n    cp -R \"$pkgname\"/Payload/* /opt/ 2>/dev/null || true\n\
+        \    cp -R \"$pkgname\"/Payload/* /opt/devkitpro/ 2>/dev/null || true\ndone\n\nexport DEVKITPRO=/opt/devkitpro\nexport\
+        \ PATH=\"$DEVKITPRO/pacman/bin:$PATH\"\n\necho \"=== \u521D\u59CB\u5316 pacman keyring ===\"\npacman-key --init 2>&1\
+        \ | tail -3\npacman-key --populate devkitpro 2>&1 | tail -3\n\necho \"=== \u5B89\u88C5 Switch \u5DE5\u5177\u94FE ===\"\
+        \npacman -Syy --noconfirm 2>&1 | tail -5\npacman -S --noconfirm \\\n    devkitA64 libnx switch-tools switch-mesa switch-glfw\
+        \ switch-glm \\\n    switch-freetype switch-libpng switch-bzip2 switch-zlib \\\n    switch-jpeg switch-lz4 2>&1 |\
+        \ tail -10\n\necho \"=== \u9A8C\u8BC1\u5B89\u88C5 ===\"\nls $DEVKITPRO/libnx/switch_rules\nwhich aarch64-none-elf-gcc\n\
+        \necho \"$DEVKITPRO/pacman/bin\" >> $GITHUB_PATH\necho \"$DEVKITPRO/tools/bin\" >> $GITHUB_PATH\n"
+    - name: Clone dependencies
+      run: "git clone --depth 1 -b moonlight_wiliwili \\\n  https://github.com/XITRIX/borealis.git \\\n  borealis/moonlight_wiliwili\n\
+        git clone --depth 1 -b 1.16.x \\\n  https://github.com/ArtifexSoftware/mupdf.git mupdf\nls borealis/moonlight_wiliwili/CMakeLists.txt\
+        \ mupdf/Makefile\n"
+    - name: Build Borealis
+      run: "export DEVKITPRO=/opt/devkitpro\ncd borealis/moonlight_wiliwili && mkdir -p build && cd build\ncmake .. \\\n \
+        \ -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/libnx/cmake/Toolchain.cmake \\\n  -DCMAKE_BUILD_TYPE=Release \\\n  -DBOREALIS_BUILD_TESTS=OFF\n\
+        make -j$(nproc) 2>&1 | tail -10\n"
+    - name: Build MuPDF
+      run: "export DEVKITPRO=/opt/devkitpro\ncd mupdf\nmake -j$(nproc) build=release \\\n  HAVE_TESSERA=no HAVE_GLFW=no NOX11=yes\
+        \ NOGLCALLS=yes \\\n  CROSS=aarch64-none-elf- \\\n  XCFLAGS=\"-D__SWITCH__ -I$DEVKITPRO/libnx/include\" \\\n  2>&1\
+        \ | tail -20 || echo \"MuPDF may need manual config\"\n"
+    - name: Build MJNexus Switch
+      run: "export DEVKITPRO=/opt/devkitpro\ncd $GITHUB_WORKSPACE\nif [ -f mupdf/build/release/libmupdf.a ]; then\n  mkdir\
+        \ -p lib && cp mupdf/build/release/libmupdf.a lib/\nfi\nmake -j$(nproc) 2>&1 | tail -30\nls -la build/*.nro 2>/dev/null\
+        \ && echo \"NRO built!\" || echo \"NRO not found\"\n"
+    - name: Build Forwarder NSP
+      if: always()
+      run: "export DEVKITPRO=/opt/devkitpro\nif [ -f build/mjnexus_switch.nro ]; then\n  bash scripts/build_nsp.sh \\\n  \
+        \  --nro build/mjnexus_switch.nro \\\n    --output dist \\\n    --title-id 0x0100000000001000\nelse\n  echo \"Skipping\
+        \ NSP - no NRO\"\nfi\n"
+    - name: Upload Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mjnexus-switch-build
+        path:
+        - build/*.nro
+        - dist/*.nsp
+        - dist/*.nacp
+        - dist/*.npdm
+        if-no-files-found: ignore
