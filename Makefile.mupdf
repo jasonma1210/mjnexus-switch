@@ -6,15 +6,14 @@ $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/de
 endif
 
 MUPDF_DIR := mupdf
+PORTLIBS  := $(DEVKITPRO)/portlibs/switch
 
-# Cross-compiler
 CC      := aarch64-none-elf-gcc
 AR      := aarch64-none-elf-ar
 
 ARCH     := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC
-SWITCH_INC := -I$(DEVKITPRO)/libnx/include
+SWITCH_INC := -I$(DEVKITPRO)/libnx/include -I$(PORTLIBS)/include
 
-# MuPDF 1.16.1 has bundled thirdparty libs we use directly
 DEFINES := \
     -DNDEBUG -DTOFU -DTOFU_CJK \
     -D__SWITCH__ \
@@ -44,7 +43,6 @@ INCLUDES := \
 
 CFLAGS   := $(ARCH) -O2 -Wno-error -std=gnu11 $(DEFINES) $(INCLUDES)
 
-# Source lists (MuPDF 1.16.1)
 FITZ_SRC := $(wildcard $(MUPDF_DIR)/source/fitz/*.c)
 PDF_SRC  := $(wildcard $(MUPDF_DIR)/source/pdf/*.c)
 XPS_SRC  := $(wildcard $(MUPDF_DIR)/source/xps/*.c)
@@ -58,7 +56,6 @@ THIRD_SRC := \
     $(wildcard $(MUPDF_DIR)/thirdparty/openjpeg/src/lib/openjp2/*.c) \
     $(wildcard $(MUPDF_DIR)/thirdparty/zlib/*.c)
 
-# Slim freetype (embedded from MuPDF scripts)
 FT_SRC := $(MUPDF_DIR)/scripts/freetype/ftbase.c \
           $(MUPDF_DIR)/scripts/freetype/ftbbox.c \
           $(MUPDF_DIR)/scripts/freetype/ftbitmap.c \
@@ -74,9 +71,8 @@ FT_SRC := $(MUPDF_DIR)/scripts/freetype/ftbase.c \
           $(MUPDF_DIR)/scripts/freetype/fttype1.c \
           $(MUPDF_DIR)/scripts/freetype/ftutil.c
 
-# Filter out unsupported files
+# 过滤掉需要 lcms2 的颜色管理文件（我们禁用了 ICC）
 FITZ_SRC := $(filter-out %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c,$(FITZ_SRC))
-THIRD_SRC := $(filter-out %ftfstype.c,$(THIRD_SRC))
 
 ALL_SRC := $(FITZ_SRC) $(PDF_SRC) $(XPS_SRC) $(CBZ_SRC) $(FB2_SRC) $(EPUB_SRC) $(SVG_SRC) $(THIRD_SRC) $(FT_SRC)
 
@@ -90,7 +86,7 @@ lib/libmupdf.a: $(OBJ_FILES)
 	@mkdir -p lib
 	@echo ">>> Archiving libmupdf.a ($(words $(OBJ_FILES)) objects)"
 	@$(AR) rcs $@ $(OBJ_FILES)
-	@echo ">>> Done: libmupdf.a ($$(du -h lib/libmupdf.a | cut -f1))"
+	@echo ">>> Done: libmupdf.a"
 
 $(OBJ_DIR)/%.o: $(MUPDF_DIR)/%.c
 	@mkdir -p $(dir $@)
