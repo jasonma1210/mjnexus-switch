@@ -33,7 +33,7 @@ ICON := resources/icons/icon.jpg
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
-CFLAGS	+=	-D__SWITCH__ -DBRLS_RESOURCES="." $(INCLUDE)
+CFLAGS	+=	-D__SWITCH__ -DBRLS_RESOURCES="./" $(INCLUDE)
 CXXFLAGS	:= $(CFLAGS) -std=c++17
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
