@@ -54,6 +54,7 @@ FITZ_SRC := $(filter-out \
     %color-lcms.c %img-png.c %img-tiff.c %save-tiff.c %write-png.c \
     %filter-jbig2.c %filter-openjpeg.c %filter-lz4.c %filter-fax.c \
     %load-png.c %load-tiff.c %save-png.c %save-tiff.c \
+    %jmemcust.c \
     ,$(FITZ_SRC))
 
 # 不再编 bundled thirdparty（全部用 Switch portlibs）
