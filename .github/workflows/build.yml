@@ -1,9 +1,7 @@
 name: Build MJNexus Switch
 
-"on":
+on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -29,7 +27,6 @@ jobs:
       - name: Clone deps
         run: |
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
-          git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
           mkdir -p data build dist lib
 
       - name: Build MuPDF
@@ -49,12 +46,10 @@ jobs:
         run: |
           set -o pipefail
           echo "=== CC=$CC ==="
-          echo "=== CXX=$CXX ==="
           which $CC && which $CXX
-          echo ""
           cd borealis/moonlight_wiliwili
           mkdir -p build_switch && cd build_switch
-          echo "=== Running CMake ==="
+          echo "=== CMake ==="
           cmake .. \
             -DPLATFORM_SWITCH=ON \
             -DUSE_DEKO3D=ON \
@@ -63,87 +58,50 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             2>&1 | tee /tmp/borealis_cmake.log
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "❌ CMake configure FAILED"
-            tail -60 /tmp/borealis_cmake.log
+            echo "❌ CMake FAILED"
+            tail -40 /tmp/borealis_cmake.log
             exit 1
           fi
           echo ""
-          echo "=== make borealis ==="
+          echo "=== make ==="
           make -j$(nproc) borealis 2>&1 | tee /tmp/borealis_build.log
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "❌ make borealis FAILED"
-            tail -80 /tmp/borealis_build.log
+            echo "❌ make FAILED"
+            tail -40 /tmp/borealis_build.log
             exit 1
           fi
           echo ""
-          echo "=== Borealis result ==="
-          BRLS_A=$(find . -name "libborealis.a" 2>/dev/null | head -1)
-            echo "Found BRLS_A: $BRLS_A"
-            if [ -n "$BRLS_A" ] && [ -f "$BRLS_A" ]; then
-              cp "$BRLS_A" ../../../lib/
-              # 复制所有其他 .a（fmt/yoga/tinyxml2/tweeny 等）
-              find . -name "*.a" ! -name "libborealis.a" -exec cp {} ../../../lib/ \;
-              echo "=== lib/ 目录所有 .a ==="
-              ls -la ../../../lib/*.a
-              echo "✅ All static libs copied"
-            else
-              echo "❌ libborealis.a NOT FOUND after build"
-              exit 1
-            fi
+          echo "=== Copy all .a ==="
+          BRLS_A=$(find . -name "libborealis.a" | head -1)
+          echo "Found: $BRLS_A"
+          cp "$BRLS_A" ../../../lib/
+          find . -name "*.a" ! -name "libborealis.a" -exec cp {} ../../../lib/ \;
+          echo "=== lib/*.a ==="
+          ls -la ../../../lib/*.a
+          echo "✅ Borealis done"
 
       - name: Build main project
         run: |
-          echo "=== Building main project ==="
-          echo "=== Checking borealis.hpp ==="
-          find borealis/moonlight_wiliwili -name "borealis.hpp" 2>/dev/null
-          echo "=== Checking Makefile INCLUDE ==="
-          grep "INCLUDES\|INCLUDE " Makefile
-          echo "=== Full compile flags test ==="
-          aarch64-none-elf-g++ -v -Iborealis/moonlight_wiliwili/library/include -c source/main.cpp -o /dev/null 2>&1 | tail -5
-          echo ""
+          echo "=== Make ==="
           make -j$(nproc) 2>&1 | tee /tmp/main.log
           if ls *.nro 1>/dev/null 2>&1 || ls build/*.nro 1>/dev/null 2>&1; then
             echo "✅ NRO built!"
             ls -la *.nro build/*.nro 2>/dev/null
           else
             echo "❌ NRO NOT FOUND"
-            grep -iE "error:|undefined reference|fatal|No rule|missing separator" /tmp/main.log | head -50
-            echo ""
-            echo "=== Full log tail ==="
-            tail -100 /tmp/main.log
+            grep -iE "error:|undefined reference|fatal|No rule|missing separator" /tmp/main.log | head -30
+            tail -80 /tmp/main.log
             exit 1
           fi
 
-      - name: Build NSP
-        run: |
-          NRO=$(ls *.nro 2>/dev/null || ls build/*.nro 2>/dev/null || echo "")
-          echo "NRO: $NRO"
-          if [ -n "$NRO" ]; then
-            bash scripts/build_nsp.sh --nro "$NRO" --output dist --title-id 0x0100000000001000
-            ls -la dist/
-          fi
-
-      - name: Upload
-        if: always()
-
-      - name: Package NSP
-        shell: bash
-        run: |
-          set -o pipefail
-          export DEVKITPRO=/opt/devkitpro
-          export PATH=$DEVKITPRO/devkitA64/bin:$DEVKITPRO/tools/bin:$PATH
-          echo "=== Packaging NSP ==="
-          dkp-pacman -Sy --noconfirm switch-tools 2>&1 | tail -3 || true
-          which hacpack && echo "✅ hacpack available" || echo "hacpack not found"
-          ls -la build/*.nro build/*.nacp romfs 2>/dev/null
-
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: mjnexus-switch-build
           path: |
-            build/*.nro
             *.nro
-            dist/*.nsp
-            dist/*.nacp
-            dist/*.npdm
+            build/*.nro
+            *.nacp
+            build/*.nacp
+            romfs/**
           if-no-files-found: ignore
