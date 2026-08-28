@@ -125,6 +125,18 @@ jobs:
 
       - name: Upload
         if: always()
+
+      - name: Package NSP
+        shell: bash
+        run: |
+          set -o pipefail
+          export DEVKITPRO=/opt/devkitpro
+          export PATH=$DEVKITPRO/devkitA64/bin:$DEVKITPRO/tools/bin:$PATH
+          echo "=== Packaging NSP ==="
+          dkp-pacman -Sy --noconfirm switch-tools 2>&1 | tail -3 || true
+          which hacpack && echo "✅ hacpack available" || echo "hacpack not found"
+          ls -la build/*.nro build/*.nacp romfs 2>/dev/null
+
         uses: actions/upload-artifact@v4
         with:
           name: mjnexus-switch-build
