@@ -14,89 +14,100 @@ jobs:
     env:
       DEVKITPRO: /opt/devkitpro
       PATH: /opt/devkitpro/devkitA64/bin:/opt/devkitpro/tools/bin:/usr/bin:/bin
+      CC: aarch64-none-elf-gcc
+      CXX: aarch64-none-elf-g++
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Verify toolchain
+      - name: Clean up auto-generated icon files
         run: |
-          echo "=== DEVKITPRO=$DEVKITPRO ==="
-          ls -la $DEVKITPRO/ 2>/dev/null | head -10
-          echo ""
-          echo "=== GCC check ==="
-          which aarch64-none-elf-gcc || echo "gcc not in PATH"
-          aarch64-none-elf-gcc --version 2>&1 | head -2
-          echo ""
-          echo "=== Portlibs dir ==="
-          ls $DEVKITPRO/portlibs/switch/include/freetype2/ft2build.h 2>/dev/null && echo "freetype OK" || echo "freetype MISSING"
-          ls $DEVKITPRO/portlibs/switch/include/harfbuzz/hb.h 2>/dev/null && echo "harfbuzz OK" || echo "harfbuzz MISSING"
-          ls $DEVKITPRO/portlibs/switch/include/zlib.h 2>/dev/null && echo "zlib OK" || echo "zlib MISSING"
+          rm -f data/icon_AmericanEnglish.jpg data/icon_*.jpg icon.jpg icon_*.jpg *.nacp
 
       - name: Clone deps
         run: |
           git clone --depth 1 -b moonlight_wiliwili https://github.com/XITRIX/borealis.git borealis/moonlight_wiliwili
           git clone --depth 1 -b 1.16.1 https://github.com/ArtifexSoftware/mupdf.git mupdf
-          mkdir -p data build dist
+          mkdir -p data build dist lib
 
-      - name: Dump file structure
-        run: |
-          echo "=== Root ==="
-          ls -la
-          echo ""
-          echo "=== data/ ==="
-          ls -la data/ 2>/dev/null
-          echo ""
-          echo "=== resources/icons/ ==="
-          ls -la resources/icons/ 2>/dev/null
-          echo ""
-          echo "=== Any icon_* files? ==="
-          find . -name 'icon_*' -o -name '*American*' 2>/dev/null
-          echo ""
-          echo "=== BINFILES test ==="
-          DATA := data
-          for f in $(ls data/*.* 2>/dev/null); do echo "  bin: $f"; done
-          echo ""
-          echo "=== switch_rules check ==="
-          grep -n "icon_American\|MULTI_ICON\|icon_" $DEVKITPRO/libnx/switch_rules 2>/dev/null | head -20
-          echo ""
-          echo "=== NACP files ==="
-          ls *.nacp 2>/dev/null
       - name: Build MuPDF
         run: |
-          export DEVKITPRO=$DEVKITPRO
-          export PATH=$PATH
           echo "=== Building MuPDF ==="
           make -f Makefile.mupdf -j$(nproc) 2>&1 | tee /tmp/mupdf.log
-          echo ""
-          echo "=== MuPDF result ==="
-          if [ -f lib/libmupdf.a ]; then
-            ls -la lib/libmupdf.a
-            echo "✅ libmupdf.a built"
-          else
+          if [ ! -f lib/libmupdf.a ]; then
             echo "❌ libmupdf.a FAILED"
-            echo ""
-            echo "=== Errors ==="
-            grep -iE "error:|undefined reference|fatal|Error" /tmp/mupdf.log | head -20
+            grep -iE "error:|undefined|fatal" /tmp/mupdf.log | head -20
+            exit 1
+          fi
+          ls -la lib/libmupdf.a
+          echo "✅ libmupdf.a built"
+
+      - name: Build Borealis (CMake)
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "=== CC=$CC ==="
+          echo "=== CXX=$CXX ==="
+          which $CC && which $CXX
+          echo ""
+          cd borealis/moonlight_wiliwili
+          mkdir -p build_switch && cd build_switch
+          echo "=== Running CMake ==="
+          cmake .. \
+            -DPLATFORM_SWITCH=ON \
+            -DUSE_DEKO3D=ON \
+            -DUSE_LIBROMFS=OFF \
+            -DBRLS_UNITY_BUILD=OFF \
+            -DCMAKE_BUILD_TYPE=Release \
+            2>&1 | tee /tmp/borealis_cmake.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "❌ CMake configure FAILED"
+            tail -60 /tmp/borealis_cmake.log
+            exit 1
+          fi
+          echo ""
+          echo "=== make borealis ==="
+          make -j$(nproc) borealis 2>&1 | tee /tmp/borealis_build.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "❌ make borealis FAILED"
+            tail -80 /tmp/borealis_build.log
+            exit 1
+          fi
+          echo ""
+          echo "=== Borealis result ==="
+          BRLS_A=$(find . -name "libborealis.a" 2>/dev/null | head -1)
+          echo "Found: $BRLS_A"
+          if [ -n "$BRLS_A" ] && [ -f "$BRLS_A" ]; then
+            cp "$BRLS_A" ../../../lib/
+            ls -la ../../../lib/libborealis.a
+            echo "✅ libborealis.a built"
+          else
+            echo "❌ libborealis.a NOT FOUND after build"
             exit 1
           fi
 
       - name: Build main project
         run: |
-          export DEVKITPRO=$DEVKITPRO
-          export PATH=$PATH
           echo "=== Building main project ==="
-          make -j$(nproc) 2>&1 | tee /tmp/main.log
+          echo "=== Checking borealis.hpp ==="
+          find borealis/moonlight_wiliwili -name "borealis.hpp" 2>/dev/null
+          echo "=== Checking Makefile INCLUDE ==="
+          grep "INCLUDES\|INCLUDE " Makefile
+          echo "=== Full compile flags test ==="
+          aarch64-none-elf-g++ -v -Iborealis/moonlight_wiliwili/library/include -c source/main.cpp -o /dev/null 2>&1 | tail -5
           echo ""
+          make -j$(nproc) 2>&1 | tee /tmp/main.log
           if ls *.nro 1>/dev/null 2>&1 || ls build/*.nro 1>/dev/null 2>&1; then
             echo "✅ NRO built!"
             ls -la *.nro build/*.nro 2>/dev/null
           else
             echo "❌ NRO NOT FOUND"
+            grep -iE "error:|undefined reference|fatal|No rule|missing separator" /tmp/main.log | head -50
             echo ""
-            echo "=== Errors ==="
-            grep -iE "error:|undefined reference|fatal|No rule|missing separator" /tmp/main.log | head -30
+            echo "=== Full log tail ==="
+            tail -100 /tmp/main.log
             exit 1
           fi
 
@@ -106,7 +117,6 @@ jobs:
           echo "NRO: $NRO"
           if [ -n "$NRO" ]; then
             bash scripts/build_nsp.sh --nro "$NRO" --output dist --title-id 0x0100000000001000
-            echo "=== NSP contents ==="
             ls -la dist/
           fi
 
