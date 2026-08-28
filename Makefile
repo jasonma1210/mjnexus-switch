@@ -26,7 +26,7 @@ VERSION_MICRO := 0
 APP_TITLE   := mjnexus_switch
 APP_AUTHOR  := mj
 APP_VERSION := ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_MICRO}
-ICON := icon.jpg
+ICON := resources/icons/icon.jpg
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
